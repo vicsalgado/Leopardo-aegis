@@ -310,6 +310,7 @@ async function loadTickets() {
   try {
     var res = await fetch(url);
     _tickets = await res.json();
+    _tickets.sort(function(a,b){ return new Date(b.updated_at) - new Date(a.updated_at); });
     updateKPIs();
     renderTickets();
   } catch(e) {
@@ -417,13 +418,16 @@ async function cambiarEstado() {
   if (!_ticketActual) return;
   var estado = document.getElementById('modal-estado').value;
   try {
-    await fetch('/api/soporte/tickets/' + _ticketActual.id, {
+    var res = await fetch('/api/soporte/tickets/' + _ticketActual.id, {
       method: 'PUT',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ estado, agente_email: _saAgente.email })
+      body: JSON.stringify({ estado: estado, agente_email: _saAgente.email })
     });
+    if (!res.ok) { var err = await res.json(); alert(err.error||'Error al cambiar estado'); return; }
     _ticketActual.estado = estado;
     renderModal();
+    // Recargar lista en background para reflejar el cambio
+    await loadTickets();
   } catch(e) { alert('Error: ' + e.message); }
 }
 
@@ -533,6 +537,12 @@ async function confirmarEliminarAgente(id, nombre) {
   var sess = loadSession();
   if (sess && sess.email) { _saAgente = sess; showApp(); }
 })();
+
+// Auto-refresh tickets cada 30s
+setInterval(function() {
+  var vistaTickets = document.getElementById('view-tickets');
+  if (vistaTickets && vistaTickets.style.display !== 'none' && _saAgente) loadTickets();
+}, 30000);
 </script>
 </body>
 </html>
